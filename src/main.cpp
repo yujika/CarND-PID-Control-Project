@@ -35,8 +35,16 @@ int main() {
 
   PID pid;
   /**
-   * TODO: Initialize the pid variable.
+   * Initialize the pid variable.
    */
+  double Kp = 0.6;// decided manually so that vehcle does not run over
+  double Kd = 6.; // decided by twiddle 
+  double Ki = 0.009; // decided by twiddle
+  int twiddle_batch_size = 100;
+  //                             Kp     Kd    Ki
+  double twiddle_initial_dp[3] = {0.00, 0.00, 0.0000}; // Choose twiddle range
+  double twiddle_tolerance = 0.00001;
+  pid.Init( Kp, Ki, Kd, twiddle_batch_size, twiddle_tolerance, twiddle_initial_dp);
 
   h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
                      uWS::OpCode opCode) {
@@ -56,23 +64,25 @@ int main() {
           double cte = std::stod(j[1]["cte"].get<string>());
           double speed = std::stod(j[1]["speed"].get<string>());
           double angle = std::stod(j[1]["steering_angle"].get<string>());
-          double steer_value;
+          double steer_value = 0.;
+	  const double target_speed = 18.0;
+	  double throttle= speed < target_speed*0.8 ? 0.8 : 0.15;
           /**
-           * TODO: Calculate steering value here, remember the steering value is
+           * Calculate steering value here, remember the steering value is
            *   [-1, 1].
            * NOTE: Feel free to play around with the throttle and speed.
            *   Maybe use another PID controller to control the speed!
            */
+	  steer_value = pid.UpdateError(cte);
+	  
+	  pid.twiddle();
           
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value 
-                    << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
+          msgJson["throttle"] = throttle;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }  // end "telemetry" if
       } else {
